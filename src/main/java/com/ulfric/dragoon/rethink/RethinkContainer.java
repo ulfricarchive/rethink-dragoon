@@ -29,6 +29,8 @@ public class RethinkContainer extends Container {
 	private Connection connection;
 
 	public RethinkContainer() {
+		install(DatabaseExtension.class);
+
 		bindRethink();
 		bindConnection();
 		bindRethinkSubscriber();

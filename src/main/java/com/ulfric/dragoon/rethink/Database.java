@@ -12,4 +12,6 @@ public @interface Database {
 
 	String value();
 
+	String table() default "default";
+
 }
