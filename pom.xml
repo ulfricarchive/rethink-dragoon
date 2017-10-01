@@ -48,6 +48,19 @@
 			<artifactId>curator-framework</artifactId>
 			<version>4.0.0</version>
 		</dependency>
+
+		<dependency>
+			<!-- MASSIVE TODO: compile latest ourselves & use it. it's got fixes -->
+			<groupId>com.rethinkdb</groupId>
+			<artifactId>rethinkdb-driver</artifactId>
+			<version>2.3.3</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.ulfric.dragoon</groupId>
+			<artifactId>activemq-dragoon</artifactId>
+			<version>1.0.0</version>
+		</dependency>
 	</dependencies>
 
 </project>
