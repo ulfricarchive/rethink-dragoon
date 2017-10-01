@@ -8,4 +8,6 @@ public interface RethinkConfig extends ConfigurationBean {
 
 	String defaultDatabase();
 
+	String defaultTable();
+
 }

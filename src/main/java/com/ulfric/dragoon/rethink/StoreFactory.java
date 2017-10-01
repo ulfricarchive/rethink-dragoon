@@ -14,8 +14,13 @@ import java.lang.reflect.Type;
 
 public class StoreFactory implements Factory {
 
+	static final String DEFAULT_KEY = "<default>";
+
 	@Inject
 	private ObjectFactory creator;
+
+	@RethinkSettings
+	private RethinkConfig settings;
 
 	@Override
 	public <T> T request(Class<T> type) {
@@ -28,8 +33,8 @@ public class StoreFactory implements Factory {
 
 		Database database = Stereotypes.getFirst(qualifier, Database.class);
 		Location defaultLocation = Location.builder()
-				.database(database.value())
-				.table(database.table())
+				.database(database.value().replace(DEFAULT_KEY, settings.defaultDatabase()))
+				.table(database.table().replace(DEFAULT_KEY, settings.defaultTable()))
 				.build();
 
 		Class<?> storeType = getStoreType(qualifier);

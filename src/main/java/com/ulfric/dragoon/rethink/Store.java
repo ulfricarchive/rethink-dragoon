@@ -111,6 +111,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		Consumer<DocumentUpdateEvent> oldListener = listeners.put(location, event -> {
 			JsonElement json = readDatabase(location);
 			T value = GSON.fromJson(json, type);
+			value.setLocation(location);
 			instance.update(value);
 		});
 

@@ -4,6 +4,10 @@ import java.util.Objects;
 
 public class Location {
 
+	public static Location key(Object key) {
+		return new Location(null, null, key);
+	}
+
 	public static Builder builder() {
 		return new Builder();
 	}

@@ -5,7 +5,6 @@ import com.rethinkdb.net.Connection;
 
 import com.ulfric.dragoon.ObjectFactory;
 import com.ulfric.dragoon.application.Container;
-import com.ulfric.dragoon.conf4j.Settings;
 import com.ulfric.dragoon.extension.inject.Inject;
 import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
 import com.ulfric.dragoon.vault.Secret;
@@ -20,7 +19,7 @@ public class RethinkContainer extends Container {
 	@Secret("rethinkdb/password") // TODO configurable to not use vault
 	private String password;
 
-	@Settings("rethinkdb")
+	@RethinkSettings
 	private RethinkConfig settings;
 
 	@Inject
