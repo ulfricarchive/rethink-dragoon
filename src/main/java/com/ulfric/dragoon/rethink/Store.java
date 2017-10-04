@@ -26,8 +26,6 @@ import java.util.logging.Logger;
 
 public class Store<T extends Document> implements AutoCloseable { // TODO unit tests
 
-	private static final Gson GSON = new Gson();
-
 	private final Class<T> type;
 	private final Location defaultLocation;
 	private final Map<Location, Consumer<DocumentUpdateEvent>> listeners = new ConcurrentHashMap<>(1);
@@ -38,6 +36,9 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 
 	@Inject(optional = true)
 	private Logger logger;
+
+	@Inject
+	private Gson gson;
 
 	@Inject
 	private RethinkDB rethinkdb;
@@ -99,7 +100,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 
 	private Instance<T> getFromDatabase(Location location) {
 		UpdatableInstance<T> instance = new UpdatableInstance<>();
-		T value = GSON.fromJson(readDatabase(location), type);
+		T value = gson.fromJson(readDatabase(location), type);
 		instance.update(value);
 
 		createListener(location, instance);
@@ -110,13 +111,13 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	private void createListener(Location location, UpdatableInstance<T> instance) {
 		Consumer<DocumentUpdateEvent> oldListener = listeners.put(location, event -> {
 			JsonElement json = readDatabase(location);
-			T value = GSON.fromJson(json, type);
+			T value = gson.fromJson(json, type);
 			value.setLocation(location);
 			instance.update(value);
 		});
 
 		if (oldListener != null) {
-			alert(GSON.toJson(location) + " had a duplicate listener");
+			alert(gson.toJson(location) + " had a duplicate listener");
 		}
 	}
 
@@ -126,7 +127,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.get(location.getKey())
 				.run(connection);
 
-		return GSON.toJsonTree(json);
+		return gson.toJsonTree(json);
 	}
 
 	public CompletableFuture<Response> insert(T value) {
@@ -139,7 +140,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.insert(json(location, value))
 				.run(connection);
 
-		return GSON.fromJson(GSON.toJson(result), Response.class);
+		return gson.fromJson(gson.toJson(result), Response.class);
 	}
 
 	public CompletableFuture<Response> update(T value) {
@@ -152,7 +153,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.update(json(location, value))
 				.run(connection);
 
-		return GSON.fromJson(GSON.toJson(result), Response.class);
+		return gson.fromJson(gson.toJson(result), Response.class);
 	}
 
 	public CompletableFuture<Response> replace(T value) {
@@ -165,7 +166,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.replace(json(location, value))
 				.run(connection);
 
-		return GSON.fromJson(GSON.toJson(result), Response.class);
+		return gson.fromJson(gson.toJson(result), Response.class);
 	}
 
 	public CompletableFuture<Response> sync(Location location) {
@@ -178,7 +179,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.sync()
 				.run(connection);
 
-		return GSON.fromJson(GSON.toJson(result), Response.class);
+		return gson.fromJson(gson.toJson(result), Response.class);
 	}
 
 	public CompletableFuture<Response> run(BiFunction<Location, T, Response> run, T value) {
@@ -195,12 +196,12 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	private Json json(Location location, T value) {
 		Object key = location.getKey();
 		if (key == null) {
-			rethinkdb.json(GSON.toJson(value, type));
+			rethinkdb.json(gson.toJson(value, type));
 		}
 
-		JsonObject json = (JsonObject) GSON.toJsonTree(value);
+		JsonObject json = (JsonObject) gson.toJsonTree(value);
 		json.addProperty("id", String.valueOf(key));
-		return rethinkdb.json(GSON.toJson(json));
+		return rethinkdb.json(gson.toJson(json));
 	}
 
 	private boolean isPositive(Integer value) {
