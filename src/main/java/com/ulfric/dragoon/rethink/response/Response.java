@@ -1,4 +1,4 @@
-package com.ulfric.dragoon.rethink;
+package com.ulfric.dragoon.rethink.response;
 
 import com.google.gson.annotations.SerializedName;
 

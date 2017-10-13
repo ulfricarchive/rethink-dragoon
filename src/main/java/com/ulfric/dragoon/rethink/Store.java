@@ -24,6 +24,8 @@ import com.ulfric.dragoon.extension.intercept.asynchronous.Asynchronous;
 import com.ulfric.dragoon.rethink.jms.DocumentUpdateEvent;
 import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
 import com.ulfric.dragoon.rethink.jms.RethinkTopic;
+import com.ulfric.dragoon.rethink.response.Response;
+import com.ulfric.dragoon.rethink.response.ResponseHelper;
 
 public class Store<T extends Document> implements AutoCloseable { // TODO unit tests
 
@@ -218,21 +220,11 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		Location location = location(value.getLocation());
 		Response response = run.apply(location, value);
 
-		if (changedData(response)) {
+		if (ResponseHelper.changedData(response)) {
 			notifyActiveMq(location);
 		}
 
 		return CompletableFuture.completedFuture(response);
-	}
-
-	private boolean changedData(Response response) {
-		return isPositive(response.getInserted())
-				|| isPositive(response.getReplaced())
-				|| isPositive(response.getDeleted());
-	}
-
-	private boolean isPositive(Integer value) {
-		return value != null && value > 0;
 	}
 
 	private Json json(Location location, T value) {
