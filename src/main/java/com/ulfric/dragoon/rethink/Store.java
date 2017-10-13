@@ -1,21 +1,7 @@
 package com.ulfric.dragoon.rethink;
 
-import com.rethinkdb.RethinkDB;
-import com.rethinkdb.gen.ast.Json;
-import com.rethinkdb.net.Connection;
-
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-
-import com.ulfric.dragoon.ObjectFactory;
-import com.ulfric.dragoon.activemq.event.EventPublisher;
-import com.ulfric.dragoon.extension.inject.Inject;
-import com.ulfric.dragoon.extension.intercept.asynchronous.Asynchronous;
-import com.ulfric.dragoon.rethink.jms.DocumentUpdateEvent;
-import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
-import com.ulfric.dragoon.rethink.jms.RethinkTopic;
-
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +9,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.rethinkdb.RethinkDB;
+import com.rethinkdb.gen.ast.Json;
+import com.rethinkdb.net.Connection;
+import com.rethinkdb.net.Cursor;
+import com.ulfric.dragoon.ObjectFactory;
+import com.ulfric.dragoon.activemq.event.EventPublisher;
+import com.ulfric.dragoon.extension.inject.Inject;
+import com.ulfric.dragoon.extension.intercept.asynchronous.Asynchronous;
+import com.ulfric.dragoon.rethink.jms.DocumentUpdateEvent;
+import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
+import com.ulfric.dragoon.rethink.jms.RethinkTopic;
 
 public class Store<T extends Document> implements AutoCloseable { // TODO unit tests
 
@@ -99,8 +100,13 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	}
 
 	private Instance<T> getFromDatabase(Location location) {
-		UpdatableInstance<T> instance = new UpdatableInstance<>();
 		T value = gson.fromJson(readDatabase(location), type);
+
+		return getAsWatchedInstance(value, location);
+	}
+
+	private Instance<T> getAsWatchedInstance(T value, Location location) {
+		UpdatableInstance<T> instance = new UpdatableInstance<>();
 		instance.update(value);
 
 		createListener(location, instance);
@@ -122,12 +128,37 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	}
 
 	private JsonElement readDatabase(Location location) {
-		Map<String, Object> json = rethinkdb.db(location.getDatabase())
+		Map<String, Object> document = rethinkdb.db(location.getDatabase())
 				.table(location.getTable())
 				.get(location.getKey())
 				.run(connection);
 
-		return gson.toJsonTree(json);
+		return gson.toJsonTree(document);
+	}
+
+	@Asynchronous
+	public CompletableFuture<List<Instance<T>>> listAllFromDatabase() { // TODO cleanup method
+		Cursor<Map<String, Object>> table = rethinkdb.db(defaultDatabase())
+			.table(defaultTable())
+			.run(connection);
+
+		List<Instance<T>> instances = new ArrayList<>(table.bufferedSize()); // TODO make sure bufferedSize returns what I think it does
+
+		Location.Builder builder = defaultLocation.toBuilder();
+
+		for (Map<String, Object> document : table) {
+			Location location = builder.key(document.get("id")).build();
+
+			Instance<T> instance = cache.computeIfAbsent(location, key -> {
+				JsonElement json = gson.toJsonTree(document);
+				T value = gson.fromJson(json, type);
+				return getAsWatchedInstance(value, key);
+			});
+
+			instances.add(instance);
+		}
+
+		return CompletableFuture.completedFuture(instances);
 	}
 
 	public CompletableFuture<Response> insert(T value) {
@@ -182,15 +213,26 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		return gson.fromJson(gson.toJson(result), Response.class);
 	}
 
+	@Asynchronous
 	public CompletableFuture<Response> run(BiFunction<Location, T, Response> run, T value) {
 		Location location = location(value.getLocation());
 		Response response = run.apply(location, value);
 
-		if (isPositive(response.getInserted())) {
+		if (changedData(response)) {
 			notifyActiveMq(location);
 		}
 
 		return CompletableFuture.completedFuture(response);
+	}
+
+	private boolean changedData(Response response) {
+		return isPositive(response.getInserted())
+				|| isPositive(response.getReplaced())
+				|| isPositive(response.getDeleted());
+	}
+
+	private boolean isPositive(Integer value) {
+		return value != null && value > 0;
 	}
 
 	private Json json(Location location, T value) {
@@ -202,10 +244,6 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		JsonObject json = (JsonObject) gson.toJsonTree(value);
 		json.addProperty("id", String.valueOf(key));
 		return rethinkdb.json(gson.toJson(json));
-	}
-
-	private boolean isPositive(Integer value) {
-		return value != null && value > 0;
 	}
 
 	private void notifyActiveMq(Location location) {

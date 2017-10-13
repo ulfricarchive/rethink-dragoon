@@ -5,6 +5,10 @@ import java.util.Objects;
 public class Location {
 
 	public static Location key(Object key) {
+		return new Location(null, null, key == null ? null : key.toString());
+	}
+
+	public static Location key(String key) {
 		return new Location(null, null, key);
 	}
 
@@ -15,7 +19,7 @@ public class Location {
 	public static class Builder {
 		private String database;
 		private String table;
-		private Object key;
+		private String key;
 
 		protected Builder() {
 		}
@@ -35,6 +39,11 @@ public class Location {
 		}
 
 		public Builder key(Object key) {
+			this.key = key == null ? null : key.toString();
+			return this;
+		}
+
+		public Builder key(String key) {
 			this.key = key;
 			return this;
 		}
@@ -42,11 +51,11 @@ public class Location {
 
 	private final String database;
 	private final String table;
-	private final Object key;
+	private final String key;
 	private int hashCode;
 	private boolean hashed;
 
-	protected Location(String database, String table, Object key) {
+	protected Location(String database, String table, String key) {
 		this.database = database;
 		this.table = table;
 		this.key = key;
@@ -62,6 +71,10 @@ public class Location {
 
 	public Object getKey() {
 		return key;
+	}
+
+	public Builder toBuilder() {
+		return builder().database(database).table(table).key(key);
 	}
 
 	@Override
