@@ -1,15 +1,14 @@
 package com.ulfric.dragoon.rethink;
 
+import javax.jms.MessageConsumer;
+
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.net.Connection;
-
 import com.ulfric.dragoon.ObjectFactory;
 import com.ulfric.dragoon.application.Container;
 import com.ulfric.dragoon.extension.inject.Inject;
 import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
 import com.ulfric.dragoon.vault.Secret;
-
-import javax.jms.MessageConsumer;
 
 public class RethinkContainer extends Container {
 
@@ -30,11 +29,22 @@ public class RethinkContainer extends Container {
 	public RethinkContainer() {
 		install(DatabaseExtension.class);
 
+		addBootHook(this::registerBindings);
+
+		addShutdownHook(this::unregisterBindings);
+		addShutdownHook(this::closeConnection);
+	}
+
+	private void registerBindings() {
 		bindRethink();
 		bindConnection();
 		bindRethinkSubscriber();
+	}
 
-		addShutdownHook(this::closeConnection);
+	private void unregisterBindings() {
+		factory.bind(RethinkDB.class).toNothing();
+		factory.bind(Connection.class).toNothing();
+		factory.bind(RethinkSubscriber.class).toNothing();
 	}
 
 	private void bindRethink() {
@@ -62,7 +72,7 @@ public class RethinkContainer extends Container {
 	}
 
 	private void closeConnection() {
-		if (connection != null) {
+		if (connection != null && connection.isOpen()) {
 			connection.close();
 		}
 	}

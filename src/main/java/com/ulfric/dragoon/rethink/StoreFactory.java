@@ -1,5 +1,8 @@
 package com.ulfric.dragoon.rethink;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+
 import com.ulfric.dragoon.Factory;
 import com.ulfric.dragoon.ObjectFactory;
 import com.ulfric.dragoon.Parameters;
@@ -8,9 +11,6 @@ import com.ulfric.dragoon.qualifier.GenericQualifier;
 import com.ulfric.dragoon.qualifier.Qualifier;
 import com.ulfric.dragoon.reflect.Instances;
 import com.ulfric.dragoon.stereotype.Stereotypes;
-
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 
 public class StoreFactory implements Factory {
 
