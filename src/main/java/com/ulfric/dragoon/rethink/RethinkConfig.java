@@ -6,6 +6,8 @@ public interface RethinkConfig extends ConfigurationBean {
 
 	long timeout();
 
+	String host();
+
 	String defaultDatabase();
 
 	String defaultTable();

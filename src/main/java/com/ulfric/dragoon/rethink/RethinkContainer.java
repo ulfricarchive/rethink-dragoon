@@ -1,5 +1,7 @@
 package com.ulfric.dragoon.rethink;
 
+import java.util.logging.Logger;
+
 import javax.jms.MessageConsumer;
 
 import com.rethinkdb.RethinkDB;
@@ -10,7 +12,7 @@ import com.ulfric.dragoon.extension.inject.Inject;
 import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
 import com.ulfric.dragoon.vault.Secret;
 
-public class RethinkContainer extends Container {
+public class RethinkContainer extends Container { // TODO aop logging
 
 	@Secret("rethinkdb/username") // TODO configurable to not use vault
 	private String username;
@@ -23,6 +25,9 @@ public class RethinkContainer extends Container {
 
 	@Inject
 	private ObjectFactory factory;
+
+	@Inject(optional = true)
+	private Logger logger;
 
 	private Connection connection;
 
@@ -53,13 +58,17 @@ public class RethinkContainer extends Container {
 
 	private void bindConnection() {
 		factory.bind(Connection.class).toLazy(parameters -> {
+			
+			log("Connecting to rethinkdb at %s with timeout of %d seconds", settings.host(), settings.timeout());
+
 			RethinkDB rethink = factory.request(RethinkDB.class);
 			connection = rethink.connection()
-				.hostname("localhost") // TODO configurable - localhost for local proxy (or just hosted locally
+				.hostname(settings.host()) // TODO configurable - localhost for local proxy (or just hosted locally
 				.user(username, password)
 				.db(settings.defaultDatabase())
 				.timeout(settings.timeout())
 				.connect(); // TODO retries
+
 			return connection;
 		});
 	}
@@ -74,6 +83,12 @@ public class RethinkContainer extends Container {
 	private void closeConnection() {
 		if (connection != null && connection.isOpen()) {
 			connection.close();
+		}
+	}
+
+	private void log(String message, Object... format) {
+		if (logger != null) {
+			logger.info(String.format(message, format));
 		}
 	}
 
