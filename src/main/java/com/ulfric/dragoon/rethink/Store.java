@@ -10,6 +10,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+import com.google.common.util.concurrent.Futures;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -138,18 +139,23 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		cache.clear();
 	}
 
-	@Asynchronous
 	public CompletableFuture<Instance<T>> get(Location location) {
 		location = location(location);
 
-		Instance<T> instance = cache.computeIfAbsent(location, this::getFromDatabase);
+		Instance<T> instance = cache.computeIfAbsent(location, this::getFromDatabaseIgnoringCachesUnchecked);
 		return CompletableFuture.completedFuture(instance);
 	}
 
-	private Instance<T> getFromDatabase(Location location) {
-		T value = gson.fromJson(readDatabase(location), type);
+	private Instance<T> getFromDatabaseIgnoringCachesUnchecked(Location location) {
+		return Futures.getUnchecked(getFromDatabaseIgnoringCaches(location));
+	}
 
-		return getAsWatchedInstance(value, location);
+	@Asynchronous
+	public CompletableFuture<Instance<T>> getFromDatabaseIgnoringCaches(Location location) {
+		T value = gson.fromJson(readRawJsonFromDatabase(location), type);
+		Instance<T> instance = getAsWatchedInstance(value, location);
+
+		return CompletableFuture.completedFuture(instance);
 	}
 
 	private Instance<T> getAsWatchedInstance(T value, Location location) {
@@ -163,7 +169,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 
 	private void createListener(Location location, UpdatableInstance<T> instance) {
 		Consumer<DocumentUpdateEvent> oldListener = listeners.put(location, event -> {
-			JsonElement json = readDatabase(location);
+			JsonElement json = readRawJsonFromDatabase(location);
 			T value = gson.fromJson(json, type);
 			value.setLocation(location);
 			instance.update(value);
@@ -174,7 +180,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		}
 	}
 
-	private JsonElement readDatabase(Location location) {
+	private JsonElement readRawJsonFromDatabase(Location location) {
 		Map<String, Object> document = rethinkdb.db(location.getDatabase())
 				.table(location.getTable())
 				.get(location.getKey())
