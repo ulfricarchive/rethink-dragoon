@@ -10,8 +10,8 @@ import java.lang.annotation.Target;
 @Target(FIELD)
 public @interface Database {
 
-	String value() default StoreFactory.DEFAULT_KEY;
+	String value() default RethinkContainer.DEFAULT_KEY;
 
-	String table() default StoreFactory.DEFAULT_KEY;
+	String table() default RethinkContainer.DEFAULT_KEY;
 
 }

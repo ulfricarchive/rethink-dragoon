@@ -15,12 +15,14 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.rethinkdb.RethinkDB;
 import com.rethinkdb.gen.ast.Json;
+import com.rethinkdb.gen.exc.ReqlOpFailedError;
 import com.rethinkdb.net.Connection;
 import com.rethinkdb.net.Cursor;
 import com.ulfric.dragoon.ObjectFactory;
 import com.ulfric.dragoon.activemq.event.EventPublisher;
 import com.ulfric.dragoon.extension.inject.Inject;
 import com.ulfric.dragoon.extension.intercept.asynchronous.Asynchronous;
+import com.ulfric.dragoon.extension.postconstruct.PostConstruct;
 import com.ulfric.dragoon.rethink.jms.DocumentUpdateEvent;
 import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
 import com.ulfric.dragoon.rethink.jms.RethinkTopic;
@@ -46,11 +48,11 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	@Inject
 	private RethinkDB rethinkdb;
 
-	@Inject
+	@Inject(optional = true)
 	@RethinkTopic
 	private EventPublisher<DocumentUpdateEvent> publisher;
 
-	@Inject
+	@Inject(optional = true)
 	@RethinkTopic
 	private RethinkSubscriber subscriber;
 
@@ -63,6 +65,45 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 
 		this.type = type;
 		this.defaultLocation = defaultLocation;
+	}
+
+	@PostConstruct
+	private void prepareRethinkDb() {
+		createDatabase();
+		createTable();
+	}
+
+	private void createDatabase() {
+		try {
+			String database = defaultDatabase();
+
+			Object created = rethinkdb.dbCreate(defaultDatabase()).run(connection);
+			Response response = response(created);
+			if (ResponseHelper.changedData(response)) {
+				info(String.format("Created database '%s'", database));
+			} else {
+				info(String.format("Database '%s' already exists, but no exception was thrown", database));
+			}
+		} catch (ReqlOpFailedError databaseAlreadyExists) {
+			info(databaseAlreadyExists.getMessage());
+		}
+	}
+
+	private void createTable() {
+		try {
+			String database = defaultDatabase();
+			String table = defaultTable();
+
+			Object created = rethinkdb.db(database).tableCreate(table).run(connection);
+			Response response = response(created);
+			if (ResponseHelper.changedData(response)) {
+				info(String.format("Created table '%s' in database '%s'", table, database));
+			} else {
+				info(String.format("Table '%s' already exists in database '%s', but no exception was thrown", table, database));
+			}
+		} catch (ReqlOpFailedError tableAlreadyExists) {
+			info(tableAlreadyExists.getMessage());
+		}
 	}
 
 	public void close(T value) {
@@ -83,12 +124,16 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 			return;
 		}
 
-		subscriber.removeListener(location, listener);
+		if (subscriber != null) {
+			subscriber.removeListener(location, listener);
+		}
 	}
 
 	@Override
 	public void close() {
-		listeners.forEach(subscriber::removeListener);
+		if (subscriber != null) {
+			listeners.forEach(subscriber::removeListener);
+		}
 		listeners.clear();
 		cache.clear();
 	}
@@ -173,7 +218,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.insert(json(location, value))
 				.run(connection);
 
-		return gson.fromJson(gson.toJson(result), Response.class);
+		return response(result);
 	}
 
 	public CompletableFuture<Response> update(T value) {
@@ -186,7 +231,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.update(json(location, value))
 				.run(connection);
 
-		return gson.fromJson(gson.toJson(result), Response.class);
+		return response(result);
 	}
 
 	public CompletableFuture<Response> replace(T value) {
@@ -199,7 +244,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.replace(json(location, value))
 				.run(connection);
 
-		return gson.fromJson(gson.toJson(result), Response.class);
+		return response(result);
 	}
 
 	public CompletableFuture<Response> sync(Location location) {
@@ -212,7 +257,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.sync()
 				.run(connection);
 
-		return gson.fromJson(gson.toJson(result), Response.class);
+		return response(result);
 	}
 
 	@Asynchronous
@@ -238,7 +283,15 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		return rethinkdb.json(gson.toJson(json));
 	}
 
+	private Response response(Object map) {
+		return gson.fromJson(gson.toJson(map), Response.class);
+	}
+
 	private void notifyActiveMq(Location location) {
+		if (publisher == null) {
+			return; // TODO log warning?
+		}
+
 		DocumentUpdateEvent event = new DocumentUpdateEvent();
 		event.setTimestamp(System.currentTimeMillis());
 		event.setLocation(location);
@@ -310,6 +363,12 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 
 	private Object defaultkey() {
 		return this.defaultLocation.getKey();
+	}
+
+	private void info(String message) {
+		if (logger != null) {
+			logger.info(message);
+		}
 	}
 
 	private void alert(String message) {

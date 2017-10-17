@@ -14,6 +14,10 @@ public class Response {
 	private Integer errors;
 	private Integer skipped;
 	private Integer synced;
+	@SerializedName("dbs_created")
+	private Integer databasesCreated;
+	@SerializedName("tables_created")
+	private Integer tablesCreated;
 	@SerializedName("generated_keys")
 	private List<UUID> generatedKeys;
 
@@ -71,6 +75,22 @@ public class Response {
 
 	public void setSynced(Integer synced) {
 		this.synced = synced;
+	}
+
+	public Integer getDatabasesCreated() {
+		return databasesCreated;
+	}
+
+	public void setDatabasesCreated(Integer databasesCreated) {
+		this.databasesCreated = databasesCreated;
+	}
+
+	public Integer getTablesCreated() {
+		return tablesCreated;
+	}
+
+	public void setTablesCreated(Integer tablesCreated) {
+		this.tablesCreated = tablesCreated;
 	}
 
 	public List<UUID> getGeneratedKeys() {

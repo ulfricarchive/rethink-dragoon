@@ -34,7 +34,7 @@ public class Location {
 		}
 
 		public Builder table(String table) {
-			this.table = table;
+			this.table = table.replace('/', '_');
 			return this;
 		}
 

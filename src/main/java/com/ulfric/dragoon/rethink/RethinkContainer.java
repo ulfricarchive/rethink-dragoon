@@ -1,5 +1,7 @@
 package com.ulfric.dragoon.rethink;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.logging.Logger;
 
 import javax.jms.MessageConsumer;
@@ -9,12 +11,18 @@ import com.rethinkdb.net.Connection;
 import com.ulfric.dragoon.ObjectFactory;
 import com.ulfric.dragoon.application.Container;
 import com.ulfric.dragoon.extension.inject.Inject;
+import com.ulfric.dragoon.qualifier.GenericQualifier;
+import com.ulfric.dragoon.qualifier.Qualifier;
+import com.ulfric.dragoon.reflect.Instances;
 import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
+import com.ulfric.dragoon.stereotype.Stereotypes;
 import com.ulfric.dragoon.vault.Secret;
 
 public class RethinkContainer extends Container { // TODO aop logging
 
-	@Secret("rethinkdb/username") // TODO configurable to not use vault
+	static final String DEFAULT_KEY = "<default>";
+
+	@Secret(value = "rethinkdb/username", fallbackSecret = "admin") // TODO configurable to not use vault
 	private String username;
 
 	@Secret("rethinkdb/password") // TODO configurable to not use vault
@@ -32,11 +40,9 @@ public class RethinkContainer extends Container { // TODO aop logging
 	private Connection connection;
 
 	public RethinkContainer() {
-		install(DatabaseExtension.class);
-
 		addBootHook(this::registerBindings);
-
 		addShutdownHook(this::unregisterBindings);
+
 		addShutdownHook(this::closeConnection);
 	}
 
@@ -44,16 +50,49 @@ public class RethinkContainer extends Container { // TODO aop logging
 		bindRethink();
 		bindConnection();
 		bindRethinkSubscriber();
+		bindStore();
 	}
 
 	private void unregisterBindings() {
 		factory.bind(RethinkDB.class).toNothing();
 		factory.bind(Connection.class).toNothing();
 		factory.bind(RethinkSubscriber.class).toNothing();
+		factory.bind(Store.class).toNothing();
+	}
+
+	private void bindStore() {
+		factory.bind(Store.class).toFunction(parameters -> {
+			Qualifier qualifier = parameters.getQualifier();
+
+			Database database = Stereotypes.getFirst(qualifier, Database.class);
+			Location defaultLocation = Location.builder()
+					.database(database.value().replace(DEFAULT_KEY, settings.defaultDatabase()))
+					.table(database.table().replace(DEFAULT_KEY, settings.defaultTable()))
+					.build();
+
+			Class<?> storeType = getStoreType(qualifier);
+
+			return Instances.instance(Store.class, storeType, defaultLocation);
+		});
+	}
+
+	private Class<?> getStoreType(Qualifier qualifier) {
+		if (qualifier instanceof GenericQualifier) {
+			Type genericType = ((GenericQualifier) qualifier).getGenericType();
+
+			if (genericType instanceof ParameterizedType) {
+				ParameterizedType parameterizedType = (ParameterizedType) genericType;
+				return (Class<?>) parameterizedType.getActualTypeArguments()[0]; // TODO validate type arguments, improve this whole line
+			}
+		}
+
+		return qualifier.getType();
 	}
 
 	private void bindRethink() {
-		factory.bind(RethinkDB.class).toValue(RethinkDB.r);
+		factory.bind(RethinkDB.class).toFunction(ignore -> {
+			return RethinkDB.r;
+		});
 	}
 
 	private void bindConnection() {
