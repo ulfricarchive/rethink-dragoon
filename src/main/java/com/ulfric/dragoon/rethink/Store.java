@@ -284,7 +284,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 			rethinkdb.json(gson.toJson(value, type));
 		}
 
-		JsonObject json = (JsonObject) gson.toJsonTree(value);
+		JsonObject json = gson.fromJson(gson.toJson(value), JsonElement.class).getAsJsonObject();
 		json.addProperty("id", String.valueOf(key));
 		return rethinkdb.json(gson.toJson(json));
 	}
