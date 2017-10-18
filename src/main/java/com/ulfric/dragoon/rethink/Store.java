@@ -153,6 +153,9 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	@Asynchronous
 	public CompletableFuture<Instance<T>> getFromDatabaseIgnoringCaches(Location location) {
 		T value = gson.fromJson(readRawJsonFromDatabase(location), type);
+		if (value.getLocation() == null) {
+			value.setLocation(location);
+		}
 		Instance<T> instance = getAsWatchedInstance(value, location);
 
 		return CompletableFuture.completedFuture(instance);

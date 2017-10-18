@@ -2,11 +2,13 @@ package com.ulfric.dragoon.rethink;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.jms.MessageConsumer;
 
 import com.rethinkdb.RethinkDB;
+import com.rethinkdb.gen.exc.ReqlDriverError;
 import com.rethinkdb.net.Connection;
 import com.ulfric.dragoon.ObjectFactory;
 import com.ulfric.dragoon.application.Container;
@@ -101,12 +103,16 @@ public class RethinkContainer extends Container { // TODO aop logging
 			log("Connecting to rethinkdb at %s with timeout of %d seconds", settings.host(), settings.timeout());
 
 			RethinkDB rethink = factory.request(RethinkDB.class);
-			connection = rethink.connection()
-				.hostname(settings.host()) // TODO configurable - localhost for local proxy (or just hosted locally
-				.user(username, password)
-				.db(settings.defaultDatabase())
-				.timeout(settings.timeout())
-				.connect(); // TODO retries
+			try {
+				connection = rethink.connection()
+						.hostname(settings.host()) // TODO configurable - localhost for local proxy (or just hosted locally
+						.user(username, password)
+						.db(settings.defaultDatabase())
+						.timeout(settings.timeout())
+						.connect(); // TODO retries
+			} catch (ReqlDriverError exception) {
+				error("Failed to connect to rethinkdb", exception);
+			}
 
 			return connection;
 		});
@@ -128,6 +134,12 @@ public class RethinkContainer extends Container { // TODO aop logging
 	private void log(String message, Object... format) {
 		if (logger != null) {
 			logger.info(String.format(message, format));
+		}
+	}
+
+	private void error(String message, Throwable thrown) {
+		if (logger != null) {
+			logger.log(Level.SEVERE, message, thrown);
 		}
 	}
 
