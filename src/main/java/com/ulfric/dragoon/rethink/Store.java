@@ -139,6 +139,10 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		cache.clear();
 	}
 
+	public Instance<T> getFromCache(Location location) {
+		return cache.get(location);
+	}
+
 	public CompletableFuture<Instance<T>> get(Location location) {
 		location = location(location);
 
