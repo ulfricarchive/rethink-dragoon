@@ -151,18 +151,21 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	}
 
 	private Instance<T> getFromDatabaseIgnoringCachesUnchecked(Location location) {
-		return Futures.getUnchecked(getFromDatabaseIgnoringCaches(location));
+		T value = Futures.getUnchecked(getFromDatabaseIgnoringCaches(location));
+
+		Instance<T> instance = getAsWatchedInstance(value, location);
+
+		return instance;
 	}
 
 	@Asynchronous
-	public CompletableFuture<Instance<T>> getFromDatabaseIgnoringCaches(Location location) {
+	public CompletableFuture<T> getFromDatabaseIgnoringCaches(Location location) {
 		T value = gson.fromJson(readRawJsonFromDatabase(location), type);
 		if (value.getLocation() == null) {
 			value.setLocation(location);
 		}
-		Instance<T> instance = getAsWatchedInstance(value, location);
 
-		return CompletableFuture.completedFuture(instance);
+		return CompletableFuture.completedFuture(value);
 	}
 
 	private Instance<T> getAsWatchedInstance(T value, Location location) {
@@ -271,6 +274,20 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 				.run(connection);
 
 		return response(result);
+	}
+
+	public CompletableFuture<Response> delete(T value) {
+		return run(this::delete, value);
+	}
+
+	private Response delete(Location location, T ignore) {
+		Object result = rethinkdb.db(location.getDatabase())
+				.table(location.getTable())
+				.get(location.getKey())
+				.delete()
+				.run(connection);
+
+		return response(result); // TODO do we need to update the Instance<T>?
 	}
 
 	@Asynchronous
