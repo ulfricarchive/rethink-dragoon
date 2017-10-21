@@ -3,6 +3,10 @@ package com.ulfric.dragoon.rethink.response;
 public class ResponseHelper {
 
 	public static boolean changedData(Response response) {
+		if (response == null) {
+			return false;
+		}
+
 		return isPositive(response.getInserted())
 				|| isPositive(response.getReplaced())
 				|| isPositive(response.getDeleted())

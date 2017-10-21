@@ -69,7 +69,7 @@ public class Location {
 		return table;
 	}
 
-	public Object getKey() {
+	public String getKey() {
 		return key;
 	}
 
