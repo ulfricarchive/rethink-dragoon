@@ -23,6 +23,7 @@ import com.ulfric.dragoon.activemq.event.EventPublisher;
 import com.ulfric.dragoon.extension.inject.Inject;
 import com.ulfric.dragoon.extension.intercept.asynchronous.Asynchronous;
 import com.ulfric.dragoon.extension.postconstruct.PostConstruct;
+import com.ulfric.dragoon.reflect.Instances;
 import com.ulfric.dragoon.rethink.jms.DocumentUpdateEvent;
 import com.ulfric.dragoon.rethink.jms.RethinkSubscriber;
 import com.ulfric.dragoon.rethink.jms.RethinkTopic;
@@ -202,11 +203,19 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		return response(result);
 	}
 
+	public CompletableFuture<Response> delete(Location location) {
+		T dummy = Instances.instance(type); // TODO better solution
+		dummy.setLocation(location);
+		return delete(dummy);
+	}
+
 	public CompletableFuture<Response> delete(T value) {
-		return run(this::delete, value);
+		return this.run(this::delete, value);
 	}
 
 	private Response delete(Location location, T ignore) {
+		Objects.requireNonNull(location.getKey(), "key"); // TODO is this needed? not taking chances right now
+
 		Object result = databaseTable(location)
 				.get(location.getKey())
 				.delete()
