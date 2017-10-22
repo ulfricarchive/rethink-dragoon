@@ -2,6 +2,8 @@ package com.ulfric.dragoon.rethink;
 
 import java.util.Objects;
 
+import org.apache.curator.shaded.com.google.common.base.MoreObjects;
+
 public class Location {
 
 	public static Location key(Object key) {
@@ -107,6 +109,15 @@ public class Location {
 		hashCode = Objects.hash(database, table, key);
 		hashed = true;
 		return hashCode;
+	}
+
+	@Override
+	public String toString() {
+		return MoreObjects.toStringHelper(this)
+				.add("database", database)
+				.add("table", table)
+				.add("key", key)
+				.toString();
 	}
 
 }

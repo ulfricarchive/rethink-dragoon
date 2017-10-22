@@ -237,7 +237,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	}
 
 	private Table databaseTable(Location location) {
-		return rethinkdb.db(location.getDatabase()).table(location.getKey());
+		return rethinkdb.db(location.getDatabase()).table(location.getTable());
 	}
 
 	private Json json(Location location, T value) {
