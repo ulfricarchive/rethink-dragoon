@@ -129,16 +129,19 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 			instance.lockWrite();
 
 			isAbsent = instance.isAbsent();
-			if (!isAbsent) {
-				instance.unlockWrite();
-			} else {
+			if (isAbsent) {
 				return getFromDatabaseBypassingCache(location)
 						.whenComplete((value, error) -> { // TODO error handling
+							if (value == null) {
+								value = Instances.instance(type); // TODO is this what we really want?
+							}
 							instance.update(value);
 							instance.unlockWrite();
 						})
 						.thenApply(ignore -> instance);
 			}
+
+			instance.unlockWrite();
 		}
 
 		return CompletableFuture.completedFuture(instance);
@@ -147,7 +150,7 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	@Asynchronous
 	public CompletableFuture<T> getFromDatabaseBypassingCache(Location location) {
 		T value = readFromDatabase(location);
-		if (value.getLocation() == null) {
+		if (value != null && value.getLocation() == null) {
 			value.setLocation(location);
 		}
 
