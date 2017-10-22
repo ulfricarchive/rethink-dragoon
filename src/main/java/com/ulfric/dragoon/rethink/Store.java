@@ -107,28 +107,40 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		}
 	}
 
-	public Instance<T> getFromLocalCache(Location location) {
-		return cache.get(location);
+	public T getFromLocalCache(Location location) {
+		Instance<T> instance = cache.get(location);
+		return instance == null ? null : instance.get();
 	}
 
 	public CompletableFuture<Instance<T>> get(Location location) {
 		location = location(location);
 
 		UpdatableInstance<T> instance = instance(location);
+
+		boolean isAbsent;
 		instance.lockRead();
 		try {
-			if (instance.isAbsent()) {
-				instance.lockWrite();
-				getFromDatabaseBypassingCache(location)
-					.whenComplete((value, error) -> { // TODO error handling
-						instance.update(value);
-						instance.unlockWrite();
-					})
-					.thenApply(ignore -> instance);
-			}
+			isAbsent = instance.isAbsent();
 		} finally {
 			instance.unlockRead();
 		}
+
+		if (isAbsent) {
+			instance.lockWrite();
+
+			isAbsent = instance.isAbsent();
+			if (!isAbsent) {
+				instance.unlockWrite();
+			} else {
+				return getFromDatabaseBypassingCache(location)
+						.whenComplete((value, error) -> { // TODO error handling
+							instance.update(value);
+							instance.unlockWrite();
+						})
+						.thenApply(ignore -> instance);
+			}
+		}
+
 		return CompletableFuture.completedFuture(instance);
 	}
 
