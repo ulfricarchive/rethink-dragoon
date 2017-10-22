@@ -99,7 +99,6 @@ public class RethinkContainer extends Container { // TODO aop logging
 
 	private void bindConnection() {
 		factory.bind(Connection.class).toLazy(parameters -> {
-			
 			log("Connecting to rethinkdb at %s with timeout of %d seconds", settings.host(), settings.timeout());
 
 			RethinkDB rethink = factory.request(RethinkDB.class);
@@ -115,6 +114,10 @@ public class RethinkContainer extends Container { // TODO aop logging
 			}
 
 			return connection;
+		});
+
+		factory.bind(ConnectionFactory.class).toLazy(parameters -> {
+			return new ReconnectingConnectionFactory(factory.request(Connection.class));
 		});
 	}
 
