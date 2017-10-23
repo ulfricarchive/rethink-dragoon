@@ -112,8 +112,8 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 		return instance == null ? null : instance.get();
 	}
 
-	public CompletableFuture<Instance<T>> get(Location location) {
-		location = location(location);
+	public CompletableFuture<Instance<T>> get(Location key) {
+		Location location = location(key);
 
 		UpdatableInstance<T> instance = instance(location);
 
@@ -131,9 +131,10 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 			isAbsent = instance.isAbsent();
 			if (isAbsent) {
 				return getFromDatabaseBypassingCache(location)
-						.whenComplete((value, error) -> { // TODO error handling
+						.thenAccept(value -> { // TODO error handling
 							if (value == null) {
 								value = Instances.instance(type); // TODO is this what we really want?
+								value.setLocation(location);
 							}
 							instance.update(value);
 							instance.unlockWrite();
@@ -212,7 +213,8 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 
 	private Response insert(Location location, T value) {
 		Object result = databaseTable(location)
-				.insert(json(location, value))
+				.get(location.getKey())
+				.replace(json(location, value))
 				.run(connection.get());
 
 		return response(result);
@@ -256,13 +258,17 @@ public class Store<T extends Document> implements AutoCloseable { // TODO unit t
 	}
 
 	private Json json(Location location, T value) {
-		Object key = location.getKey();
+		String key = location.getKey();
 		if (key == null) {
-			rethinkdb.json(gson.toJson(value, type));
+			return rethinkdb.json(gson.toJson(value, type));
 		}
 
-		JsonObject json = gson.fromJson(gson.toJson(value), JsonElement.class).getAsJsonObject();
-		json.addProperty("id", String.valueOf(key));
+		JsonElement jsonElement = gson.fromJson(gson.toJson(value, type), JsonElement.class);
+		if (jsonElement == null) {
+			jsonElement = new JsonObject();
+		}
+		JsonObject json = jsonElement.getAsJsonObject();
+		json.addProperty("id", key);
 		return rethinkdb.json(gson.toJson(json));
 	}
 
