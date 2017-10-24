@@ -7,7 +7,7 @@ import com.rethinkdb.net.Connection;
 public class ReconnectingConnectionFactory implements ConnectionFactory {
 
 	private final Connection connection;
-	private final Object lock = new Object();
+	private final Object mutex = new Object();
 
 	public ReconnectingConnectionFactory(Connection connection) {
 		Objects.requireNonNull(connection, "connection");
@@ -18,7 +18,7 @@ public class ReconnectingConnectionFactory implements ConnectionFactory {
 	@Override
 	public Connection get() {
 		if (!connection.isOpen()) {
-			synchronized(lock) {
+			synchronized(mutex) {
 				if (!connection.isOpen()) {
 					connection.reconnect();
 				}
